@@ -1,0 +1,28 @@
+<svg viewBox="0 0 620 160" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1f7ae0"/>
+      <stop offset="100%" stop-color="#0b4fa8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon mark, scaled/translated into the left ~150px -->
+  <g transform="translate(10, -10) scale(0.72)">
+    <path d="M100 10 L174 38 L174 106 C174 152 142 182 100 196
+             C58 182 26 152 26 106 L26 38 Z"
+          fill="url(#shieldGrad)" stroke="#07356f" stroke-width="3"/>
+    <circle cx="97" cy="98" r="40" fill="none" stroke="#ffffff" stroke-width="5" opacity="0.95"/>
+    <circle cx="97" cy="98" r="9" fill="#ffffff"/>
+    <line x1="97" y1="98" x2="134" y2="70" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="134" cy="70" r="6" fill="#ffffff"/>
+    <circle cx="150" cy="150" r="28" fill="#1a7f37" stroke="#ffffff" stroke-width="5"/>
+    <path d="M137 150 L147 160 L165 138" fill="none" stroke="#ffffff" stroke-width="7"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="175" y="95" font-family="Arial, Helvetica, sans-serif" font-size="58"
+        font-weight="700" fill="#1d1f24">Drive<tspan fill="#0b4fa8">Guard</tspan></text>
+  <text x="177" y="126" font-family="Arial, Helvetica, sans-serif" font-size="19"
+        fill="#5a6472" letter-spacing="0.5">Copy it. Checksum it. Prove it.</text>
+</svg>

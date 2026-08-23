@@ -1,4 +1,6 @@
-# DriveGuard 🛡️
+<p align="center">
+  <img src="assets/logo-wordmark.svg" alt="DriveGuard" width="480">
+</p>
 
 **Copy a drive. Verify every byte. Prove it to your client.**
 
@@ -45,7 +47,7 @@ DriveGuard adds all three on top of rsync, without reinventing the wheel underne
    retransfer actually fixed things. Anything still broken after a retry is
    flagged for manual attention instead of silently reported as fine.
 
-The result is an HTML report with summary cards and a full per-file table:
+The result is an HTML report with summary cards, a **Failed Transfers** table up top (so problems jump out immediately), and a full **All Files** table underneath with everything:
 
 | Original Path | New Path | Status | Notes |
 |---|---|---|---|
@@ -53,13 +55,45 @@ The result is an HTML report with summary cards and a full per-file table:
 | `/old/drive/docs/report.docx` | `/new/drive/backup/docs/report.docx` | Verified (auto-retransferred) | Checksum mismatch detected after initial transfer; automatically re-copied and re-verified. |
 | `/old/drive/logs/corrupt.log` | `/new/drive/backup/logs/corrupt.log` | Failed | Permission denied (13) |
 
+If nothing failed, the Failed Transfers table is replaced with a green all-clear banner instead of an empty table. Optionally generate a PDF version of the same report with `--pdf` — handy for emailing a client or archiving alongside the job.
+
+### Technician report
+
+Add `--tech-report` to also generate a second, internal-facing report meant for
+you or your team rather than the client. It leads with a **directory-level
+failure rollup** — every failed file's path collapsed to (by default) 4
+directory levels deep, so you can spot a bad folder ("`Photos/2020/Vacation/Day1`
+— 2 failed") without scrolling past thousands of individual rows — followed by
+the **full error list** with the complete error message for every failure and
+which pass it happened in (initial transfer, checksum retransfer, or final
+verification), plus any raw rsync output that didn't cleanly map to a specific
+file. Files that failed checksum but were auto-fixed are called out separately
+too, since a cluster of those can be an early sign of a flaky cable or a dying
+source drive even though nothing technically failed.
+
+```bash
+python3 driveguard.py /mnt/old_drive /mnt/new_drive/client_backup --tech-report
+```
+
+By default this writes `<report>_technician.html` next to your main report. Use
+`--tech-report PATH` for a custom name, and `--tech-report-depth N` to change
+how many directory levels the rollup collapses to (default 4). `--pdf` covers
+both reports if `--tech-report` is set.
+
 ## Requirements
 
 - Linux
 - Python 3.7+
 - `rsync` (3.1+ recommended, for `--info=progress2` support)
 
-No third-party Python packages needed — standard library only.
+The HTML reports themselves need no extra packages. PDF export (`--pdf`) needs one
+of the following (DriveGuard tries them in this order and tells you which one
+it used):
+- `pip install weasyprint --break-system-packages` (pure Python, recommended)
+- `wkhtmltopdf` installed system-wide (`sudo apt install wkhtmltopdf`)
+
+If neither is present, `--pdf` prints install instructions and the run still
+completes normally — you just get the HTML report(s) without a PDF alongside them.
 
 ## Usage
 
@@ -75,7 +109,9 @@ That's it — full pipeline, sensible defaults, HTML report written to
 ```bash
 sudo python3 driveguard.py /mnt/old_drive /mnt/new_drive/client_backup \
     --report acme_corp_migration_report.html \
-    --title "Acme Corp — Drive Migration, Aug 2026"
+    --title "Acme Corp — Drive Migration, Aug 2026" \
+    --tech-report \
+    --pdf
 ```
 
 Run this inside `tmux` or `screen` for large drives — it can take a while, and
@@ -88,9 +124,14 @@ you don't want an SSH drop to kill the job.
 | `--report PATH` | `transfer_report.html` | Where to write the HTML report |
 | `--title TEXT` | `Data Transfer Report` | Report heading (put your client name here) |
 | `--rsync-args "..."` | `-aHAX --partial --info=progress2` | rsync flags for the transfer/checksum passes |
-| `--failures-only` | off | Only list problem rows in the detail table (summary counts still cover everything) |
+| `--pdf` | off | Also render PDF version(s) of the report(s) |
+| `--pdf-report PATH` | `<report>.pdf` | Custom output path for the client report's PDF |
+| `--failures-only` | off | Skip the "All Files" table entirely and only show the Failed Transfers table (summary counts still cover everything) |
+| `--tech-report [PATH]` | off | Also generate the technician report (see above). Optional custom path; default `<report>_technician.html` |
+| `--tech-report-depth N` | `4` | Directory levels to roll failures up to in the technician report's summary table |
 | `--no-checksum-verify` | off | Skip checksum verification + auto-retransfer entirely (old plain-copy behavior) |
 | `--no-final-verify` | off | Skip the final confirmation pass (still does the auto-retransfer, just doesn't double-check it afterward) |
+
 
 ### Default rsync flags, explained
 
