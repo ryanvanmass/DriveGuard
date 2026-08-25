@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo-wordmark.svg" alt="DriveGuard" width="480">
+  <img src="logo-wordmark.svg" alt="DriveGuard" width="480">
 </p>
 
 **Copy a drive. Verify every byte. Prove it to your client.**
