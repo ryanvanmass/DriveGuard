@@ -110,10 +110,23 @@ def cmd_line(cmd_list):
 class Heartbeat:
     """Prints a periodic 'still working' line with elapsed time for passes
     that produce no other output (e.g. the final verify pass, which has to
-    capture its output for parsing rather than streaming it live)."""
-    def __init__(self, message, interval=5):
+    capture its output for parsing rather than streaming it live).
+
+    If estimated_seconds is given (e.g. how long a comparable prior pass
+    took), also shows a rough progress percentage and ETA, and the print
+    interval adapts to land around target_pings messages over the estimated
+    duration (clamped to a sane range so a huge estimate doesn't go silent
+    for minutes, and a tiny one doesn't spam the console). Without an
+    estimate, falls back to a fixed interval. The estimate is not a
+    guarantee -- flagged as such in the output -- since this pass reads the
+    same data but doesn't write, so it may finish a bit faster than estimated."""
+    def __init__(self, message, interval=5, estimated_seconds=None, target_pings=15):
         self.message = message
-        self.interval = interval
+        self.estimated_seconds = estimated_seconds
+        if estimated_seconds and estimated_seconds > 0:
+            self.interval = max(1, min(60, estimated_seconds / target_pings))
+        else:
+            self.interval = interval
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self.start_time = None
@@ -121,7 +134,13 @@ class Heartbeat:
     def _run(self):
         while not self._stop.wait(self.interval):
             elapsed = time.time() - self.start_time
-            print(c(f"  ... {self.message} ({elapsed/60:.1f} min elapsed)", DIM))
+            if self.estimated_seconds:
+                pct = min(99, int(elapsed / self.estimated_seconds * 100))
+                remaining = max(0, self.estimated_seconds - elapsed)
+                print(c(f"  ... {self.message} (~{pct}% est., {elapsed/60:.1f} min elapsed, "
+                       f"~{remaining/60:.1f} min remaining)", DIM))
+            else:
+                print(c(f"  ... {self.message} ({elapsed/60:.1f} min elapsed)", DIM))
 
     def __enter__(self):
         self.start_time = time.time()
@@ -214,13 +233,14 @@ def run_checksum_retransfer(source, dest, rsync_args, log_path, stderr_path):
 
 ITEMIZE_RE = re.compile(r'^([<>ch.*][fdLDS][\.\?][\w.\+]*)\|(.*)$')
 
-def run_final_verify(source, dest, rsync_args):
+def run_final_verify(source, dest, rsync_args, estimated_seconds=None):
     """Dry-run checksum comparison to confirm nothing still differs after
     the retransfer pass. Returns a set of relpaths that still mismatch.
 
     Output is captured (not streamed live) since it needs to be parsed for
-    itemized changes, so no progress bar shows during this pass -- print a
-    heads-up before calling this so the console isn't silent."""
+    itemized changes, so no progress bar shows during this pass -- a
+    heartbeat with an estimated ETA (based on the checksum pass's duration,
+    if provided) prints periodically so the console isn't silent."""
     src = source if source.endswith(os.sep) else source + os.sep
     base_args = [a for a in rsync_args.split() if a not in ("--partial", "--info=progress2")]
     if "--checksum" not in base_args and "-c" not in base_args:
@@ -231,7 +251,7 @@ def run_final_verify(source, dest, rsync_args):
     ]
     cmd_line(cmd)
     start = time.time()
-    with Heartbeat("verifying checksums"):
+    with Heartbeat("verifying checksums", estimated_seconds=estimated_seconds):
         proc = subprocess.run(cmd, capture_output=True, text=True)
     elapsed = time.time() - start
 
@@ -811,7 +831,8 @@ def main():
 
         if not args.no_final_verify:
             step_header(f"Step 3/{n_steps} -- Final verification")
-            still_mismatched, verify_elapsed = run_final_verify(source, dest, args.rsync_args)
+            still_mismatched, verify_elapsed = run_final_verify(
+                source, dest, args.rsync_args, estimated_seconds=checksum_elapsed)
             if still_mismatched:
                 fail_line(f"{len(still_mismatched)} file(s) still mismatched after retransfer -- "
                           f"needs manual attention ({verify_elapsed/60:.1f} min)")

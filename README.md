@@ -45,7 +45,15 @@ DriveGuard adds all three on top of rsync, without reinventing the wheel underne
    Anything that doesn't match (or is missing) gets automatically re-copied.
 3. **Final verification pass** — a dry-run checksum check to confirm the
    retransfer actually fixed things. Anything still broken after a retry is
-   flagged for manual attention instead of silently reported as fine.
+   flagged for manual attention instead of silently reported as fine. This
+   pass has no live progress bar (its output has to be captured and parsed
+   rather than streamed), so instead it prints a periodic heartbeat with an
+   estimated ETA based on how long the checksum pass took — a reasonable
+   proxy since both read the same data, though this pass finishes a bit
+   faster since it only reads, it doesn't write. The print interval adapts
+   to land around 15 updates over the estimated duration (clamped between
+   1s and 60s per update, so a 10-second job and a 2-hour job both get a
+   sensible pace instead of console spam or dead silence).
 
 The result is an HTML report with summary cards, a **Failed Transfers** table up top (so problems jump out immediately), and a full **All Files** table underneath with everything:
 
