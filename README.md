@@ -69,27 +69,27 @@ If nothing failed, the Failed Transfers table is replaced with a green all-clear
 
 Add `--tech-report` to also generate a second, internal-facing report meant for
 you or your team rather than the client. It leads with a **directory-level
-failure rollup** — every failed file's path collapsed to (by default) 4
-directory levels deep, ranked by failure count, showing only the top 2
-directories by default so the worst offenders jump out immediately without
-scrolling past thousands of individual rows (any remaining directories are
-summarized in a one-line note) — followed by the **full error list** with the
-complete error message for every failure and which pass it happened in
-(initial transfer, checksum retransfer, or final verification), plus any raw
-rsync output that didn't cleanly map to a specific file. Files that failed
-checksum but were auto-fixed are called out separately too, since a cluster of
-those can be an early sign of a flaky cable or a dying source drive even
-though nothing technically failed.
+failure rollup** — every failed file's path collapsed to (by default) 2
+directory levels deep and ranked by failure count, so the worst-hit folders
+jump out immediately without scrolling past thousands of individual rows —
+followed by the **full error list** with the complete error message for every
+failure and which pass it happened in (initial transfer, checksum retransfer,
+or final verification), plus any raw rsync output that didn't cleanly map to
+a specific file. Files that failed checksum but were auto-fixed are called
+out separately too, since a cluster of those can be an early sign of a flaky
+cable or a dying source drive even though nothing technically failed.
 
 ```bash
 python3 driveguard.py /mnt/old_drive /mnt/new_drive/client_backup --tech-report
 ```
 
-By default this writes `<report>_technician.html` next to your main report. Use
-`--tech-report PATH` for a custom name, `--tech-report-depth N` to change how
-many directory levels the rollup collapses to (default 4), and
-`--tech-report-top-dirs N` to change how many directories show in the summary
-table (default 2). `--pdf` covers both reports if `--tech-report` is set.
+By default this writes `<report>_technician.html` next to your main report and
+shows every failed directory. Use `--tech-report PATH` for a custom name,
+`--tech-report-depth N` to change how many directory levels the rollup
+collapses to (default 2), and `--tech-report-top-dirs N` if you'd rather cap
+the summary table to just the top N directories by failure count (off by
+default — any capped-off directories get a one-line note pointing to the full
+error list below). `--pdf` covers both reports if `--tech-report` is set.
 
 ## Requirements
 
@@ -139,8 +139,8 @@ you don't want an SSH drop to kill the job.
 | `--pdf-report PATH` | `<report>.pdf` | Custom output path for the client report's PDF |
 | `--failures-only` | off | Skip the "All Files" table entirely and only show the Failed Transfers table (summary counts still cover everything) |
 | `--tech-report [PATH]` | off | Also generate the technician report (see above). Optional custom path; default `<report>_technician.html` |
-| `--tech-report-depth N` | `4` | Directory levels to roll failures up to in the technician report's summary table |
-| `--tech-report-top-dirs N` | `2` | How many directories to show in the technician report's failure summary, ranked by failure count |
+| `--tech-report-depth N` | `2` | Directory levels to roll failures up to in the technician report's summary table |
+| `--tech-report-top-dirs N` | off (shows all) | Cap the technician report's directory summary to the top N directories by failure count |
 | `--no-checksum-verify` | off | Skip checksum verification + auto-retransfer entirely (old plain-copy behavior) |
 | `--no-final-verify` | off | Skip the final confirmation pass (still does the auto-retransfer, just doesn't double-check it afterward) |
 

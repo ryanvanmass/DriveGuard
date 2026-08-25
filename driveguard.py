@@ -554,7 +554,7 @@ def build_report(source, dest, rows, stats, unmatched,
 
 def build_tech_report(source, dest, rows, stats, unmatched, returncode, elapsed,
                        report_path, title, checksum_elapsed=None, verify_elapsed=None,
-                       dir_depth=4, top_n_dirs=2):
+                       dir_depth=2, top_n_dirs=None):
     """Technician-facing report: a directory-level failure rollup up front
     (so problem folders jump out without scrolling past thousands of rows),
     followed by the complete error list with full messages and which pass
@@ -572,8 +572,12 @@ def build_tech_report(source, dest, rows, stats, unmatched, returncode, elapsed,
 
     if dir_counts:
         dir_rows_sorted = sorted(dir_counts.items(), key=lambda kv: (-kv[1], kv[0]))
-        shown = dir_rows_sorted[:top_n_dirs]
-        remainder = dir_rows_sorted[top_n_dirs:]
+        if top_n_dirs is not None:
+            shown = dir_rows_sorted[:top_n_dirs]
+            remainder = dir_rows_sorted[top_n_dirs:]
+        else:
+            shown = dir_rows_sorted
+            remainder = []
         dir_table_rows = "".join(
             f"""
         <tr>
@@ -587,8 +591,10 @@ def build_tech_report(source, dest, rows, stats, unmatched, returncode, elapsed,
             remainder_note = (f"""<p class="note">+ {len(remainder)} more director{"y" if len(remainder)==1 else "ies"} """
                               f"""with failures ({remainder_files} file{"s" if remainder_files != 1 else ""} total) """
                               f"""-- see the Full Error List below for everything.</p>""")
+        heading = (f"Top {top_n_dirs} Failed Directories (up to {dir_depth} levels deep)" if top_n_dirs is not None
+                  else f"Failed Directories (up to {dir_depth} levels deep)")
         dir_summary_html = f"""
-<h2>Top {top_n_dirs} Failed Directories (up to {dir_depth} levels deep)</h2>
+<h2>{heading}</h2>
 <table>
 <thead><tr><th>Directory</th><th>Failed File Count</th></tr></thead>
 <tbody>{dir_table_rows}</tbody>
@@ -770,12 +776,12 @@ def main():
                           "(up to --tech-report-depth levels deep) plus the full error list with "
                           "every message and which pass it failed in. Optional path; default is "
                           "<report>_technician.html")
-    ap.add_argument("--tech-report-depth", type=int, default=4,
+    ap.add_argument("--tech-report-depth", type=int, default=2,
                      help="How many directory levels deep to roll failures up to in the technician "
-                          "report's directory summary (default: 4)")
-    ap.add_argument("--tech-report-top-dirs", type=int, default=2,
-                     help="How many directories to show in the technician report's failure summary "
-                          "table, ranked by failure count (default: 2)")
+                          "report's directory summary (default: 2)")
+    ap.add_argument("--tech-report-top-dirs", type=int, default=None,
+                     help="Limit the technician report's directory summary to only the top N "
+                          "directories by failure count. Default: show all failed directories.")
     args = ap.parse_args()
 
     source = os.path.abspath(args.source)
