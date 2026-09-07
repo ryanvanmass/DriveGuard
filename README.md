@@ -198,6 +198,21 @@ For very large file counts (500k+), the HTML report table can get heavy in a
 browser. Use `--failures-only` to keep the detail table lean — summary counts
 still reflect the full job either way.
 
+## Running tests
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
+
+The suite covers the parsing/report-generation logic directly, the PDF
+conversion path (including simulated weasyprint crashes and errors — no real
+Pango/cairo failure needed to exercise that code), the `--convert-pdf` CLI
+surface, and a handful of true end-to-end tests that run the real `driveguard.py`
+against a real `rsync` on a small synthetic file tree — including a regression
+test asserting `--no-inc-recursive` is present on every rsync invocation.
+
 ## License
 
 MIT — do whatever you want with it.
