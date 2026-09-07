@@ -135,6 +135,20 @@ sudo python3 driveguard.py /mnt/old_drive /mnt/new_drive/client_backup \
 Run this inside `tmux` or `screen` for large drives — it can take a while, and
 you don't want an SSH drop to kill the job.
 
+### Converting a report to PDF after the fact
+
+If `--pdf` failed (or you skipped it) during the original run, you don't need
+to re-copy the whole drive just to get a PDF — the HTML report already has
+everything a PDF render needs:
+
+```bash
+python3 driveguard.py --convert-pdf acme_corp_migration_report.html
+```
+
+Writes `acme_corp_migration_report.pdf` next to it by default; use `--pdf-report`
+for a custom output path. Takes no `source`/`dest` — it only touches the report
+file you point it at.
+
 ### Options
 
 | Flag | Default | Description |
@@ -144,6 +158,7 @@ you don't want an SSH drop to kill the job.
 | `--rsync-args "..."` | `-aHAX --partial --info=progress2` | rsync flags for the transfer/checksum passes |
 | `--pdf` | off | Also render PDF version(s) of the report(s) |
 | `--pdf-report PATH` | `<report>.pdf` | Custom output path for the client report's PDF |
+| `--convert-pdf HTML_PATH` | off | Convert an existing HTML report to PDF and exit — no source/dest needed |
 | `--failures-only` | off | Skip the "All Files" table entirely and only show the Failed Transfers table (summary counts still cover everything) |
 | `--tech-report [PATH]` | off | Also generate the technician report (see above). Optional custom path; default `<report>_technician.html` |
 | `--tech-report-depth N` | `2` | Directory levels to roll failures up to in the technician report's summary table |
