@@ -13,7 +13,7 @@ report showing:
 
 Usage:
     python3 driveguard.py /path/to/source /path/to/destination \
-        [--report report.html] [--rsync-args "-aHAX --partial"] [--title "Client Name - Drive Migration"]
+        [--report report.html] [--rsync-args "-aHAX --partial --no-inc-recursive"] [--title "Client Name - Drive Migration"]
 
 Pipeline:
   1. Initial transfer with rsync.
@@ -34,11 +34,16 @@ Notes:
     its output has to be captured and parsed rather than streamed -- a
     message is printed before it starts so the console isn't silently
     hanging.
-  - Default rsync flags (-aHAX --partial --info=progress2) preserve
-    permissions, timestamps, ownership, hard links, ACLs and extended
-    attributes -- a solid default for a full drive-to-drive migration.
-    Adjust with --rsync-args if needed (e.g. drop -X if the destination
-    filesystem doesn't support xattrs).
+  - Default rsync flags (-aHAX --partial --info=progress2
+    --no-inc-recursive) preserve permissions, timestamps, ownership, hard
+    links, ACLs and extended attributes -- a solid default for a full
+    drive-to-drive migration. Adjust with --rsync-args if needed (e.g.
+    drop -X if the destination filesystem doesn't support xattrs).
+    --no-inc-recursive forces rsync to fully scan the source tree before
+    transferring instead of discovering files as it goes -- slightly
+    slower to start on huge trees, but it's what keeps the live progress
+    percentage accurate instead of dipping as rsync's running total grows
+    mid-transfer.
   - Checksum verification reads every byte of every file on both sides, so
     it roughly doubles the total I/O time on top of the initial copy. That's
     the cost of a real integrity check -- worth it for a client deliverable,
@@ -758,8 +763,9 @@ def main():
     ap.add_argument("source", help="Source path (e.g. /mnt/old_drive)")
     ap.add_argument("dest", help="Destination path (e.g. /mnt/new_drive/client_backup)")
     ap.add_argument("--report", default="transfer_report.html", help="Output HTML report path")
-    ap.add_argument("--rsync-args", default="-aHAX --partial --info=progress2",
-                     help="rsync flags to use (default: -aHAX --partial --info=progress2)")
+    ap.add_argument("--rsync-args", default="-aHAX --partial --info=progress2 --no-inc-recursive",
+                     help="rsync flags to use (default: -aHAX --partial --info=progress2 "
+                          "--no-inc-recursive)")
     ap.add_argument("--title", default="Data Transfer Report", help="Report title")
     ap.add_argument("--failures-only", action="store_true",
                      help="Skip the 'All Files' table entirely and only show the Failed Transfers table "

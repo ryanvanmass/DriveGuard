@@ -134,7 +134,7 @@ you don't want an SSH drop to kill the job.
 |---|---|---|
 | `--report PATH` | `transfer_report.html` | Where to write the HTML report |
 | `--title TEXT` | `Data Transfer Report` | Report heading (put your client name here) |
-| `--rsync-args "..."` | `-aHAX --partial --info=progress2` | rsync flags for the transfer/checksum passes |
+| `--rsync-args "..."` | `-aHAX --partial --info=progress2 --no-inc-recursive` | rsync flags for the transfer/checksum passes |
 | `--pdf` | off | Also render PDF version(s) of the report(s) |
 | `--pdf-report PATH` | `<report>.pdf` | Custom output path for the client report's PDF |
 | `--failures-only` | off | Skip the "All Files" table entirely and only show the Failed Transfers table (summary counts still cover everything) |
@@ -153,9 +153,15 @@ you don't want an SSH drop to kill the job.
 - `-X` — preserve extended attributes (xattrs)
 - `--partial` — keep partially-transferred files so an interrupted run can resume instead of restarting
 - `--info=progress2` — live overall progress bar
+- `--no-inc-recursive` — fully scans the source tree before transferring
+  instead of discovering files as it goes. Without this, rsync's
+  incremental recursion (the default since rsync 3.0) can make the live
+  progress percentage dip mid-transfer, since its running total grows as
+  more of the tree is discovered — this trades a bit of startup time on
+  very large trees for an accurate, monotonically increasing percentage.
 
 If your destination filesystem doesn't support ACLs/xattrs (e.g. FAT/exFAT),
-drop them: `--rsync-args "-aH --partial --info=progress2"`
+drop them: `--rsync-args "-aH --partial --info=progress2 --no-inc-recursive"`
 
 ## A note on time
 
