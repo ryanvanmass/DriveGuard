@@ -15,6 +15,11 @@ Usage:
     python3 driveguard.py /path/to/source /path/to/destination \
         [--report report.html] [--rsync-args "-aHAX --partial --no-inc-recursive"] [--title "Client Name - Drive Migration"]
 
+    Convert an already-generated HTML report to PDF later (e.g. if --pdf
+    failed, or wasn't used, during the original run) without re-running
+    the transfer:
+        python3 driveguard.py --convert-pdf report.html [--pdf-report report.pdf]
+
 Pipeline:
   1. Initial transfer with rsync.
   2. Checksum verification pass (rsync --checksum): re-reads every file on
@@ -812,10 +817,44 @@ def convert_html_to_pdf(html_path, pdf_path):
     print("  sudo apt install wkhtmltopdf                     (system package, alternative)", flush=True)
     return False, None
 
+def convert_pdf_and_exit(html_path, pdf_report_arg):
+    """Standalone --convert-pdf entry point: turn an already-generated
+    DriveGuard HTML report into a PDF and exit, without touching source/
+    dest or re-running any part of the transfer. Exists so a failed (or
+    skipped) --pdf during the original run doesn't mean re-copying the
+    whole drive just to get a PDF afterward -- the HTML report already
+    has everything a PDF render needs.
+    """
+    html_path = os.path.abspath(html_path)
+    if not os.path.isfile(html_path):
+        sys.exit(f"HTML report not found: {html_path}")
+
+    pdf_path = os.path.abspath(pdf_report_arg) if pdf_report_arg else (
+        os.path.splitext(html_path)[0] + ".pdf")
+
+    print()
+    print(c("  DriveGuard -- PDF conversion", BOLD, BLUE))
+    print(c(f"  {html_path}  ->  {pdf_path}", DIM))
+    rule()
+
+    ok, tool = convert_html_to_pdf(html_path, pdf_path)
+    if ok:
+        ok_line(f"PDF written to {pdf_path} (via {tool})")
+        sys.exit(0)
+    else:
+        fail_line("PDF conversion failed -- see the error(s) above")
+        sys.exit(1)
+
 def main():
     ap = argparse.ArgumentParser(description="Copy a drive with rsync and produce an HTML transfer report.")
-    ap.add_argument("source", help="Source path (e.g. /mnt/old_drive)")
-    ap.add_argument("dest", help="Destination path (e.g. /mnt/new_drive/client_backup)")
+    ap.add_argument("source", nargs="?", default=None, help="Source path (e.g. /mnt/old_drive)")
+    ap.add_argument("dest", nargs="?", default=None,
+                     help="Destination path (e.g. /mnt/new_drive/client_backup)")
+    ap.add_argument("--convert-pdf", metavar="HTML_PATH", default=None,
+                     help="Convert an existing DriveGuard HTML report to PDF and exit -- no "
+                          "source/dest needed. For when --pdf failed (or wasn't used) during "
+                          "the original run and you want the PDF afterward, without re-running "
+                          "the whole transfer. Combine with --pdf-report for a custom output path.")
     ap.add_argument("--report", default="transfer_report.html", help="Output HTML report path")
     ap.add_argument("--rsync-args", default="-aHAX --partial --info=progress2 --no-inc-recursive",
                      help="rsync flags to use (default: -aHAX --partial --info=progress2 "
@@ -843,6 +882,14 @@ def main():
                      help="Limit the technician report's directory summary to only the top N "
                           "directories by failure count. Default: show all failed directories.")
     args = ap.parse_args()
+
+    if args.convert_pdf:
+        if args.source or args.dest:
+            ap.error("--convert-pdf takes no source/dest -- it converts an existing HTML report")
+        convert_pdf_and_exit(args.convert_pdf, args.pdf_report)
+
+    if not args.source or not args.dest:
+        ap.error("source and dest are required unless using --convert-pdf")
 
     source = os.path.abspath(args.source)
     dest = os.path.abspath(args.dest)
