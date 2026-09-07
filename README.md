@@ -106,6 +106,13 @@ it used):
 If neither is present, `--pdf` prints install instructions and the run still
 completes normally — you just get the HTML report(s) without a PDF alongside them.
 
+weasyprint renders in an isolated subprocess rather than in-process, specifically
+so a native-library crash (weasyprint's text layout depends on Pango/cairo via a
+C binding — an ABI mismatch on some newer distro releases can segfault the
+process outright, which no Python error handling can catch) shows up as a clear
+"weasyprint crashed" message and falls back to wkhtmltopdf, instead of silently
+producing no PDF and no explanation.
+
 ## Usage
 
 ```bash
