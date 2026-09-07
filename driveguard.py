@@ -60,12 +60,22 @@ import html
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
 import time
 import uuid
 from datetime import datetime
+
+# Line-buffer stdout even when it's not a terminal (e.g. piped to a log
+# file or captured by a wrapper) -- otherwise Python fully buffers
+# non-interactive stdout, and any status line printed shortly before a
+# hard crash (a native segfault, os._exit, etc. -- nothing an `except`
+# clause could ever catch) can be lost from the buffer entirely rather
+# than reaching wherever the output was headed.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
 
 # --- Console styling ------------------------------------------------------
 # Colorize only when writing to a real terminal, and respect the NO_COLOR
@@ -730,32 +740,76 @@ re-copied and re-verified. Not a failure, but worth noting if a pattern shows up
     with open(report_path, "w") as f:
         f.write(html_doc)
 
+_WEASYPRINT_RENDER_SCRIPT = (
+    "import sys, weasyprint\n"
+    "weasyprint.HTML(filename=sys.argv[1]).write_pdf(sys.argv[2])\n"
+)
+
+def _render_with_weasyprint(html_path, pdf_path):
+    """Runs weasyprint in a *subprocess*, not in-process. weasyprint's text
+    layout goes through Pango/cairo via a cffi/dlopen binding to system C
+    libraries -- a version/ABI mismatch there (seen on some newer distro
+    releases) can segfault or abort the process outright, which no Python
+    `except` clause can catch. If that happened in-process, driveguard.py
+    itself would die silently, skipping every bit of code (including the
+    failure message below and the wkhtmltopdf fallback) that would
+    otherwise explain what happened. Isolated in a subprocess, the same
+    crash just makes that subprocess exit with a signal, which is
+    something we *can* detect and report on.
+
+    Returns (ok, message_or_None). message_or_None is only set when there's
+    something worth telling the user -- a plain "weasyprint isn't
+    installed" is treated as silent, expected fallthrough to wkhtmltopdf.
+    """
+    result = subprocess.run(
+        [sys.executable, "-c", _WEASYPRINT_RENDER_SCRIPT, html_path, pdf_path],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0 and os.path.isfile(pdf_path) and os.path.getsize(pdf_path) > 0:
+        return True, None
+    if result.returncode < 0:
+        try:
+            sig_name = signal.Signals(-result.returncode).name
+        except ValueError:
+            sig_name = str(-result.returncode)
+        return False, (f"weasyprint crashed rendering the PDF (killed by signal {sig_name}) -- "
+                        f"this usually means a native library (Pango/cairo) is missing, broken, "
+                        f"or incompatible with this system, not a plain Python error.")
+    if "ModuleNotFoundError: No module named 'weasyprint'" in result.stderr:
+        return False, None
+    return False, f"weasyprint failed to render the PDF:\n{result.stderr.strip()}"
+
 def convert_html_to_pdf(html_path, pdf_path):
     """Render the HTML report to PDF. Tries weasyprint first (pure Python,
     `pip install weasyprint --break-system-packages`), then falls back to
-    the wkhtmltopdf command-line tool if it's on PATH. Returns (success, tool_used_or_None)."""
-    try:
-        import weasyprint
-        weasyprint.HTML(filename=html_path).write_pdf(pdf_path)
+    the wkhtmltopdf command-line tool if it's on PATH. Returns (success, tool_used_or_None).
+
+    Every failure path below prints something and every success path
+    confirms the output file actually exists -- so "the PDF just didn't
+    show up, no message" should no longer be possible regardless of what's
+    actually broken underneath."""
+    ok, message = _render_with_weasyprint(html_path, pdf_path)
+    if ok:
         return True, "weasyprint"
-    except ImportError:
-        pass
-    except Exception as e:
-        print(f"weasyprint failed to render the PDF ({e}); trying wkhtmltopdf...")
+    if message:
+        print(message, flush=True)
+        print("Trying wkhtmltopdf...", flush=True)
 
     wkhtmltopdf_bin = shutil.which("wkhtmltopdf")
     if wkhtmltopdf_bin:
         try:
             subprocess.run([wkhtmltopdf_bin, "--quiet", "--enable-local-file-access",
                             html_path, pdf_path], check=True)
-            return True, "wkhtmltopdf"
+            if os.path.isfile(pdf_path) and os.path.getsize(pdf_path) > 0:
+                return True, "wkhtmltopdf"
+            print("wkhtmltopdf exited successfully but produced no PDF file.", flush=True)
         except Exception as e:
-            print(f"wkhtmltopdf failed to render the PDF: {e}")
+            print(f"wkhtmltopdf failed to render the PDF: {e}", flush=True)
 
-    print("\nCouldn't generate a PDF -- no working renderer found.")
-    print("Install one of the following and re-run with --pdf:")
-    print("  pip install weasyprint --break-system-packages   (pure Python, recommended)")
-    print("  sudo apt install wkhtmltopdf                     (system package, alternative)")
+    print("\nCouldn't generate a PDF -- no working renderer found.", flush=True)
+    print("Install one of the following and re-run with --pdf:", flush=True)
+    print("  pip install weasyprint --break-system-packages   (pure Python, recommended)", flush=True)
+    print("  sudo apt install wkhtmltopdf                     (system package, alternative)", flush=True)
     return False, None
 
 def main():
